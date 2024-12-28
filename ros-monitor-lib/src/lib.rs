@@ -22,16 +22,6 @@ impl Drop for AbortJoinHandle {
 }
 
 impl RosMonitor {
-    #[cfg(not(unix))]
-    pub fn new(_command: impl Into<OsString>) -> Self {
-        Self {
-            state: Arc::new(Mutex::new(state::RosState::default())),
-            channel: Arc::new(Mutex::new(None)),
-            _task: Arc::new(AbortJoinHandle(tokio::spawn(async {}))),
-        }
-    }
-
-    #[cfg(unix)]
     pub fn new(command: impl Into<OsString>) -> Self {
         use std::process::Stdio;
         use tokio::io::AsyncReadExt;
@@ -108,7 +98,7 @@ impl RosMonitor {
             if let Err(error) = error {
                 let mut reason = String::new();
                 if error.to_string().contains("error while loading shared libraries") {
-                    reason.push_str("Please make sure that ROS is sourced, and try at least rolling or jazzy release.");
+                    reason.push_str("Please make sure that ROS is sourced, and try at least ROS jazzy.");
                 }
                 log::error!("ROS discovery is not available:\n{:?}{}", error, reason);
             }

@@ -1,0 +1,15 @@
+[package]
+name = "ros-monitor-bin"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "intrepid-ros-monitor"
+path = "src/main.rs"
+
+[dependencies]
+bitcode = "0.6.3"
+clap = { version = "4.4.12", features = ["derive"] }
+r2r = { git = "https://github.com/IntrepidAI/r2r.git", branch = "master" }
+ros-monitor-lib = { path = "../ros-monitor-lib" }
+serde_json = "1.0.107"

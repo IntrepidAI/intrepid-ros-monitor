@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "ros-monitor-bin",
+    "ros-monitor-lib",
+]

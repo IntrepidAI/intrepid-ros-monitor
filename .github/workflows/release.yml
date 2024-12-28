@@ -30,7 +30,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Compile binary
-        run: C:\dev\jazzy\ros2-windows\local_setup.bat ; cargo build --release
+        run: C:\dev\jazzy\ros2-windows\local_setup.ps1 ; cargo build --release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -63,7 +63,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Compile binary
-        run: source /opt/ros/rolling/local_setup.bash ; cargo build --release
+        run: source /opt/ros/jazzy/local_setup.bash ; cargo build --release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

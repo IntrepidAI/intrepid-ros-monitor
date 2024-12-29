@@ -100,17 +100,21 @@ impl RosMonitor {
             }.await;
 
             if let Err(error) = error {
+                let mut spawn_error = false;
                 if let RosMonitorError::SpawnError(err) = &error {
                     if err.kind() == std::io::ErrorKind::NotFound {
+                        spawn_error = true;
                         log::warn!("ROS discovery is not available on this platform");
                     }
                 }
 
-                let mut reason = String::new();
-                if error.to_string().contains("error while loading shared libraries") {
-                    reason.push_str("Please make sure that ROS is sourced, and try at least ROS jazzy.");
+                if !spawn_error {
+                    let mut reason = String::new();
+                    if error.to_string().contains("error while loading shared libraries") {
+                        reason.push_str("Please make sure that ROS is sourced, and try at least ROS jazzy.");
+                    }
+                    log::error!("ROS discovery is not available:\n{}{}", error, reason);
                 }
-                log::error!("ROS discovery is not available:\n{:?}{}", error, reason);
             }
 
             channel_arc_.lock().unwrap().take().unwrap();

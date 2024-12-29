@@ -1,7 +1,8 @@
 use std::ffi::OsString;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Context;
+use thiserror::Error;
+use tokio::sync::broadcast::error::RecvError;
 
 pub mod types;
 pub mod state;
@@ -35,7 +36,7 @@ impl RosMonitor {
         let channel_arc_ = channel_arc.clone();
 
         let task = AbortJoinHandle(tokio::spawn(async move {
-            let error: Result<(), anyhow::Error> = async {
+            let error: Result<(), RosMonitorError> = async {
                 let channel_ = {
                     let channel = channel_arc_.lock().unwrap();
                     channel.as_ref().unwrap().clone()
@@ -53,7 +54,7 @@ impl RosMonitor {
                         .stderr(Stdio::piped())
                         .spawn()?;
 
-                    let stdout = child.stdout.take().context("unable to capture stdout")?;
+                    let stdout = child.stdout.take().ok_or(RosMonitorError::PipeError)?;
                     let mut reader = tokio::io::BufReader::new(stdout);
 
                     loop {
@@ -86,11 +87,14 @@ impl RosMonitor {
 
                     let elapsed = started_at.elapsed();
                     if elapsed.as_millis() < 2000 {
-                        let mut stderr = child.stderr.take().context("unable to capture stderr")?;
+                        let mut stderr = child.stderr.take().ok_or(RosMonitorError::PipeError)?;
                         let mut result = String::new();
                         stderr.read_to_string(&mut result).await?;
                         let status = child.try_wait()?;
-                        Err(anyhow::anyhow!("process exited: {}\n{}", status.unwrap_or_default(), result))?;
+                        Err(RosMonitorError::ProcessExited {
+                            status: status.unwrap_or_default(),
+                            stderr: result,
+                        })?;
                     }
                 }
             }.await;
@@ -113,9 +117,9 @@ impl RosMonitor {
         }
     }
 
-    pub fn subscribe(&self) -> anyhow::Result<impl futures::TryStream<Item = anyhow::Result<types::DiscoveryEvent>>> {
+    pub fn subscribe(&self) -> Result<impl futures::TryStream<Item = Result<types::DiscoveryEvent, RecvError>>, RecvError> {
         if self.task.0.is_finished() {
-            return Err(anyhow::anyhow!("monitor is not running"));
+            return Err(RecvError::Closed);
         }
 
         let (initial, receiver) = {
@@ -128,7 +132,7 @@ impl RosMonitor {
         };
 
         Ok(async_stream::try_stream! {
-            let mut receiver = receiver.context("channel closed")?;
+            let mut receiver = receiver.ok_or(RecvError::Closed)?;
             for event in initial {
                 yield event;
             }
@@ -138,4 +142,17 @@ impl RosMonitor {
             }
         })
     }
+}
+
+#[derive(Debug, Error)]
+enum RosMonitorError {
+    #[error("unable to spawn process: {0}")]
+    SpawnError(#[from] tokio::io::Error),
+    #[error("unable to read stdout/stderr")]
+    PipeError,
+    #[error("process exited: {status}\n{stderr}")]
+    ProcessExited {
+        status: std::process::ExitStatus,
+        stderr: String,
+    },
 }

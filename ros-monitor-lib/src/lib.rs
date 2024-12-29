@@ -7,11 +7,11 @@ use tokio::sync::broadcast::error::RecvError;
 pub mod types;
 pub mod state;
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct RosMonitor {
     state: Arc<Mutex<state::RosState>>,
     channel: Arc<Mutex<Option<tokio::sync::broadcast::Sender<types::DiscoveryEvent>>>>,
-    task: Arc<AbortJoinHandle>,
+    task: Option<Arc<AbortJoinHandle>>,
 }
 
 struct AbortJoinHandle(pub tokio::task::JoinHandle<()>);
@@ -100,6 +100,12 @@ impl RosMonitor {
             }.await;
 
             if let Err(error) = error {
+                if let RosMonitorError::SpawnError(err) = &error {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        log::warn!("ROS discovery is not available on this platform");
+                    }
+                }
+
                 let mut reason = String::new();
                 if error.to_string().contains("error while loading shared libraries") {
                     reason.push_str("Please make sure that ROS is sourced, and try at least ROS jazzy.");
@@ -113,12 +119,14 @@ impl RosMonitor {
         Self {
             state: state_arc,
             channel: channel_arc,
-            task: Arc::new(task),
+            task: Some(Arc::new(task)),
         }
     }
 
     pub fn subscribe(&self) -> Result<impl futures::TryStream<Item = Result<types::DiscoveryEvent, RecvError>>, RecvError> {
-        if self.task.0.is_finished() {
+        let is_finished = self.task.as_ref().map(|task| task.0.is_finished()).unwrap_or(true);
+
+        if is_finished {
             return Err(RecvError::Closed);
         }
 

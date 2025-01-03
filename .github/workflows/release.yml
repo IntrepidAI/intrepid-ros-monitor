@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install ROS
-        run: apt install ros-humble-ros-base
+        run: sudo apt install ros-humble-ros-base
 
       - name: Setup Rust cache
         uses: actions/cache@v4
